@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-pub fn clean_input() -> (Vec<i32>, Vec<i32>) {
+fn clean_input() -> (Vec<i32>, Vec<i32>) {
     let file = File::open(Path::new("input/day1.txt")).expect("No such file exists");
     let buf = BufReader::new(file);
 
@@ -26,7 +26,7 @@ pub fn clean_input() -> (Vec<i32>, Vec<i32>) {
     return (left_side, right_side);
 }
 
-pub fn get_distance(left_side: &Vec<i32>, right_side: &Vec<i32>) {
+fn get_distance(left_side: &Vec<i32>, right_side: &Vec<i32>) {
     let mut sum = 0;
     // Zip the two vectors together
     for (left, right) in left_side.iter().zip(right_side.iter()) {
@@ -36,7 +36,7 @@ pub fn get_distance(left_side: &Vec<i32>, right_side: &Vec<i32>) {
     println!("Day 1 distance: {}", sum);
 }
 
-pub fn get_similarity(left_side: &Vec<i32>, right_side: &Vec<i32>) {
+fn get_similarity(left_side: &Vec<i32>, right_side: &Vec<i32>) {
     let mut similarity = 0;
     for left in left_side.iter() {
         let val = right_side.iter().filter(|right| right == &left).count() as i32 * left;
@@ -45,7 +45,7 @@ pub fn get_similarity(left_side: &Vec<i32>, right_side: &Vec<i32>) {
     println!("Day 1 similarity: {}", similarity);
 }
 
-pub fn get_answer() {
+pub fn get_answers() {
     let (left_side, right_side) = clean_input();
     get_distance(&left_side, &right_side);
     get_similarity(&left_side, &right_side);
