@@ -17,51 +17,42 @@ fn clean_input() -> Vec<Vec<i32>> {
     return result;
 }
 
-fn level_is_safe(report: Vec<i32>) -> bool {
-    let mut last_level: i32 = -1;
-    let mut increased = false;
-    let mut decreased = false;
+fn report_is_safe(report: &Vec<i32>) -> bool {
+    let deltas = report.windows(2).map(|w| w[1] - w[0]).collect::<Vec<i32>>(); 
+    let dangerous = deltas.windows(2).any(|w| {
+        let (a, b) = (w[0], w[1]);
+        (a.signum() != b.signum()) || (a.abs() > 3) || (b.abs() > 3) || (a.abs() == 0) || (b.abs() == 0)
+    });
 
-    for level in report {
-        // If first level, continue
-        if last_level == -1 {
-            last_level = level;
-            continue;
-        }
-
-        let difference = level - last_level;
-        let abs = difference.abs();
-
-        // Decreased
-        if difference < 0 {
-            decreased = true;
-        }
-
-        // Increased
-        else if difference > 0 {
-            increased = true;
-        }
-
-        // Increased and decreased, or stayed the same
-        if (increased && decreased) || (abs <  1 || abs > 3) {
-            return false;
-        }
-        last_level = level;
-    }
-    return true;
+    return !dangerous;
 }
 
-fn num_of_safe_levels(levels: Vec<Vec<i32>>) {
-    let mut count = 0;
-    for level in levels {
-        if level_is_safe(level) {
-            count += 1;
+
+fn num_safe_reports(reports: &mut Vec<Vec<i32>>) {
+    let mut initial_safe = 0;
+    let mut saved = 0;
+    // Count the number of reports that are safe
+    for report in reports {
+        if report_is_safe(report) {
+            initial_safe += 1;
+        }
+        else {
+           for i in 0..report.len() {
+               let mut new_report = report.clone();
+               new_report.remove(i);
+               if report_is_safe(&new_report) {
+                   saved += 1;
+                   break;
+               }
+           } 
         }
     }
-    println!("Day 2 safe count: {}", count);
+
+    println!("Day 2 Part 1 safe count: {:?}", initial_safe);
+    println!("Day 2 Part 2 safe count: {:?}", initial_safe + saved);
 }
 
 pub fn get_answers() {
-    let reports = clean_input();
-    num_of_safe_levels(reports);
+    let mut reports = clean_input();
+    num_safe_reports(&mut reports);
 }
