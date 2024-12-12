@@ -3,7 +3,6 @@ use std::{
     io::{prelude::*, BufReader},
     path::Path
 };
-// Need to get all strings that are like mul(num,num)
 
 // Use regex to match valid pattern of mul(num,num) and capture groups for the numbers
 static REG_EXP: &str = r"mul\(([0-9]{1,3}),([0-9]{1,3})\)";
@@ -16,18 +15,34 @@ fn get_input() -> String {
     return contents;
 }
 
-fn day3_part1(input: String) {
+fn get_prod_sum(input: &String) -> i32 {
     let re = regex::Regex::new(REG_EXP).expect("Couldn't compile regex");
     let mut products = Vec::new();
     for cap in re.captures_iter(&input) {
         let product = cap[1].parse::<i32>().unwrap() * cap[2].parse::<i32>().unwrap();
         products.push(product);
     }
-    println!("Day 3 Part 1 product sum: {}", products.iter().sum::<i32>());
+    return products.iter().sum::<i32>();
 }
 
+fn day3_part1(input: &String) {
+    let products = get_prod_sum(&input);
+    println!("Day 3 Part 1 product sum: {}", products);
+}
+
+fn day3_part2(input: &mut String) {
+    while input.find("don't()").is_some() {
+        let start = input.find("don't()").unwrap();
+        let sub_search: &str = &input[start..];
+        let end = sub_search.find("do()").unwrap_or(sub_search.len());
+        input.replace_range(start..(start + end), "");
+    }
+    let total = get_prod_sum(&input);
+    println!("Day 3 Part 2 product sum: {}", total);
+}
 
 pub fn get_answers() {
-    let input = get_input();
-    day3_part1(input);
+    let mut input = get_input();
+    day3_part1(&input);
+    day3_part2(&mut input);
 }
