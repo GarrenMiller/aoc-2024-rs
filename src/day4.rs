@@ -164,7 +164,6 @@ impl WordMatrix {
 
     pub fn check_for_word<I>(&mut self, row: usize, col: usize, mut chars: I) where I: Iterator<Item = char> + Clone, {
         // Check if the second character is present in the surrounding cells
-        let (mut curr_row, mut curr_col) = (row as i32, col as i32);
         let success_len = chars.clone().count() + 1;
         let mut num_letters = 1;
         let second_char = chars.next().unwrap();
@@ -174,15 +173,17 @@ impl WordMatrix {
             num_letters += 1;
         }
         for dir in directions {
+            let mut second_char_row = row as i32 + dir.values().0;
+            let mut second_char_col = col as i32 + dir.values().1;
             let mut char_list = chars.clone();            
             while let Some(next_char) = char_list.next() {
-                curr_row += dir.values().0;
-                curr_col += dir.values().1;
-                debug!("Checking for character {:?} in direction {:?} from row {:?}, col {:?}", next_char, dir, curr_row, curr_col);
-                let read_char = self.read_direction(curr_row as usize, curr_col as usize, dir).unwrap_or(' ');
+                debug!("Checking for character {:?} in direction {:?} from row {:?}, col {:?}", next_char, dir, second_char_row, second_char_col);
+                let read_char = self.read_direction(second_char_row as usize, second_char_col as usize, dir).unwrap_or(' ');
                 if next_char == read_char {
                     let dir_mags = dir.values();
-                    debug!("Found character {:?} in direction {:?} at cell ({}, {})", read_char, dir, curr_row + dir_mags.0, curr_col + dir_mags.1);
+                    second_char_row += dir_mags.0;
+                    second_char_col += dir_mags.1;
+                    debug!("Found character {:?} in direction {:?} at cell ({}, {})", read_char, dir, second_char_row + dir_mags.0, second_char_col + dir_mags.1);
                     num_letters += 1;
                     continue;
                 }
@@ -196,7 +197,7 @@ impl WordMatrix {
                 self.found.push((row, col, dir));
                 self.print_grid_when_found(found_vec);
             }
-            num_letters = 1;
+            num_letters = 2;
         }
     }
 
