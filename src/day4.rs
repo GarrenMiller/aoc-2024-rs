@@ -1,4 +1,3 @@
-use core::num;
 use std::{
     fs::File,
     io::{prelude::*, BufReader},
@@ -8,6 +7,7 @@ use std::{
 use log::{debug, error, info, warn, trace};
 use env_logger;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct WordMatrix {
     grid: Vec<Vec<char>>,
     found: Vec<(usize, usize, Direction)>,
@@ -15,26 +15,18 @@ struct WordMatrix {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Direction {
-    Up,
     Down,
-    Left,
     Right,
-    LeftUp,
     LeftDown,
-    RightUp,
     RightDown,
 }
 
 impl Direction {
     fn iterator() -> impl Iterator<Item = Direction> {
         [
-            Direction::Up,
             Direction::Down,
-            Direction::Left,
             Direction::Right,
-            Direction::LeftUp,
             Direction::LeftDown,
-            Direction::RightUp,
             Direction::RightDown,
         ]
         .iter()
@@ -43,13 +35,9 @@ impl Direction {
 
     fn values(&self) -> (i32, i32) {
         match self {
-            Direction::Up => (-1, 0),
             Direction::Down => (1, 0),
-            Direction::Left => (0, -1),
             Direction::Right => (0, 1),
-            Direction::LeftUp => (-1, -1),
             Direction::LeftDown => (1, -1),
-            Direction::RightUp => (-1, 1),
             Direction::RightDown => (1, 1),
         }
     }
@@ -67,48 +55,12 @@ impl WordMatrix {
         self.grid.push(row);
     }
 
-    pub fn read_direction(&self, row: usize, col: usize, direction: Direction) -> Option<char> {
+    pub fn read_direction(&self, row: usize, col: usize, direction: Direction) -> Option<&char> {
         let mut result = None;
         match direction {
-            Direction::Up => {
-                if row > 0 {
-                    result = Some(self.grid[row - 1][col]);
-                }
-            },
-            Direction::Down => {
-                if row + 1 < self.grid.len() {
-                    result = Some(self.grid[row + 1][col]);
-                }
-            },
-            Direction::Left => {
-                if col > 0 {
-                    result = Some(self.grid[row][col - 1]);
-                }
-            },
-            Direction::Right => {
-                if col + 1 < self.grid[row].len() {
-                    result = Some(self.grid[row][col + 1]);
-                }
-            },
-            Direction::LeftUp => {
-                if row > 0 && col > 0 {
-                    result = Some(self.grid[row - 1][col - 1]);
-                }
-            },
-            Direction::LeftDown => {
-                if row + 1 < self.grid.len() && col > 0 {
-                    result = Some(self.grid[row + 1][col - 1]);
-                }
-            },
-            Direction::RightUp => {
-                if row > 0 && col + 1 < self.grid[row].len() {
-                    result = Some(self.grid[row - 1][col + 1]);
-                }
-            },
-            Direction::RightDown => {
-                if row + 1 < self.grid.len() && col + 1 < self.grid[row].len() {
-                    result = Some(self.grid[row + 1][col + 1]);
-                }
+            direction => {
+                let (row_offset, col_offset) = direction.values();
+                result = self.grid.get((row as i32 + row_offset) as usize)?.get((col as i32 + col_offset) as usize);
             },
         }
         return result;
@@ -117,108 +69,97 @@ impl WordMatrix {
     pub fn char_is_present(&self, row: usize, col: usize, target: &char) -> Vec<Direction> {
         let mut directions = Vec::new();
         for direction in Direction::iterator() {
-            if let Some(cell) = self.read_direction(row, col, direction) {
-                if &cell == target {
-                    let reversed_direction = reverse_vec(row, col, direction, 4);
-                    if self.found.contains(&reversed_direction) {
-                        trace!("Skipping direction {:?} because it's already been found", direction);
-                        continue;
-                    }   
+            if self
+                .read_direction(row, col, direction)
+                .map_or(false, |c| c == target) {
                     directions.push(direction);
-                }
             }
         }
-        trace!("\t Found target character {:?} in directions: {:?}", target, directions);
         return directions;
     }
 
-    pub fn print_grid_when_found(&self, found_vec: (usize, usize, Direction)) {
-        // Print a grid with the found word and a - for the rest of the characters
-        debug!("Found the word:");
-        // Copy the grid
-        let mut grid_copy = self.grid.clone();
-        let mut char_indexes = Vec::new();
-        let (mut row, mut col) = (found_vec.0 as i32, found_vec.1 as i32);
-        let deltas = found_vec.2.values();
-        char_indexes.push((row, col));
-        for i in 0.."XMAS".len() - 1 {
-            row += deltas.0;
-            col += deltas.1;
-            char_indexes.push((row, col));
-        }
-        // iterate through all cells in the grid and replace the characters with - if they're not in the char_indexes
-        for i in 0..grid_copy.len() {
-            for j in 0..grid_copy[i].len() {
-                if char_indexes.contains(&(i as i32, j as i32)) {
-                    continue;
-                }
-                grid_copy[i][j] = '-';
-            }
-        }
-        // print the grid as a string
-        for row in grid_copy {
-            let row_str: String = row.iter().collect();
-            debug!("{}", row_str);
-        }
-    }
+    pub fn try_finish_word<I>(&mut self, row: usize, col: usize, mut chars: I) where I: Iterator<Item = char> + Clone, {
+        // Success == count + 1 because we're starting with the second char
+        let num_letters_for_success = chars.clone().count() + 1;
+        let mut num_letters_found = 2;
 
-    pub fn check_for_word<I>(&mut self, row: usize, col: usize, mut chars: I) where I: Iterator<Item = char> + Clone, {
-        // Check if the second character is present in the surrounding cells
-        let success_len = chars.clone().count() + 1;
-        let mut num_letters = 1;
+        // Get all directions where the second character is present
         let second_char = chars.next().unwrap();
-        let directions = self.char_is_present(row, col, &second_char);
-        debug!("Found second character {:?} in directions {:?}", second_char, directions);
-        if directions.len() > 0 {
-            num_letters += 1;
-        }
-        for dir in directions {
-            let mut second_char_row = row as i32 + dir.values().0;
-            let mut second_char_col = col as i32 + dir.values().1;
-            let mut char_list = chars.clone();            
+        let valid_directions = self.char_is_present(row, col, &second_char);
+
+        // Cycle through all valid directions
+        for dir in valid_directions {
+            let (dx, dy) = dir.values();
+            let mut pos = (row as i32 + dx, col as i32 + dy);
+            let mut char_list = chars.clone();
+
+            // Check if word is present in the direction           
             while let Some(next_char) = char_list.next() {
-                debug!("Checking for character {:?} in direction {:?} from row {:?}, col {:?}", next_char, dir, second_char_row, second_char_col);
-                let read_char = self.read_direction(second_char_row as usize, second_char_col as usize, dir).unwrap_or(' ');
-                if next_char == read_char {
-                    let dir_mags = dir.values();
-                    second_char_row += dir_mags.0;
-                    second_char_col += dir_mags.1;
-                    debug!("Found character {:?} in direction {:?} at cell ({}, {})", read_char, dir, second_char_row + dir_mags.0, second_char_col + dir_mags.1);
-                    num_letters += 1;
-                    continue;
-                }
-                else {
+                if self
+                    .read_direction(pos.0 as usize, pos.1 as usize, dir)
+                    .map_or(false, |c| c == &next_char) {
+                        pos.0 += dx;
+                        pos.1 += dy;
+                        num_letters_found += 1;
+                } else {
                     break;
                 }
             }
-            debug!("Found {} letters in direction {:?}", num_letters, dir);
-            if num_letters == success_len {
-                let found_vec = (row, col, dir);
+
+            // If the word is present, add it to the found list
+            if num_letters_found == num_letters_for_success {
                 self.found.push((row, col, dir));
-                self.print_grid_when_found(found_vec);
             }
-            num_letters = 2;
+
+            // Else reset the number of letters found
+            num_letters_found = 2;
         }
     }
 
     pub fn find_word_instances(&mut self, word: &str) {
+        self.found.clear();
+        // Iterate through characters in the grid
         for row in 0..self.grid.len() {
             for col in 0..self.grid[row].len() {
-                let start_char = word.chars().next().unwrap();
-                let end_char = word.chars().last().unwrap();
-                let current_char = self.grid[row][col];
-                if &current_char == &start_char {
-                    debug!("Found start character X in cell ({}, {})", row, col);
-                    let chars = word.chars().skip(1);
-                    self.check_for_word(row, col, chars);
-                }
-                else if &current_char == &end_char {
-                    debug!("Found end character S in cell ({}, {})", row, col);
-                    let chars = word.chars().rev().skip(1);
-                    self.check_for_word(row, col, chars);
+                // Trigger a check for the word if first or last character is detected
+                if let (Some(start), Some(end)) = (word.chars().next(), word.chars().last()) {
+                    let current = self.grid[row][col];
+                    if current == start {
+                        self.try_finish_word(row, col, word.chars().skip(1));
+                    }
+                    else if current == end {
+                        self.try_finish_word(row, col, word.chars().rev().skip(1));
+                    }
                 }
             }
         }
+    }
+
+    pub fn find_crosses(&mut self, word_length: usize) -> i32 {
+        let mut crosses = 0;
+        for word in &self.found {
+            if word.2 == Direction::RightDown && (word.1 + (word_length - 1) > self.grid[0].len() - 1) {
+                continue;
+            }
+            let mirrored_dir = match word.2 {
+                Direction::Down => None,
+                Direction::Right => None,
+                Direction::LeftDown => None,
+                Direction::RightDown => Some(Direction::LeftDown),
+            };
+            if mirrored_dir.is_none() {
+                continue;
+            }
+            // Go to the right by word_length - 1
+            let mirror = (word.0, word.1 + (word_length - 1), mirrored_dir.unwrap());
+            if mirror.1 > self.grid[0].len() - 1 {
+                continue;
+            }
+            if self.found.contains(&mirror) {
+                crosses += 1;
+            }
+        }
+        return crosses;
     }
 }
 
@@ -234,27 +175,11 @@ fn get_input() -> WordMatrix {
     return results;
 }
 
-fn reverse_vec(row: usize, column: usize, direction: Direction, word_length: i32) -> (usize, usize, Direction) {
-    let opposite_direction = match direction {
-        Direction::Up => Direction::Down,
-        Direction::Down => Direction::Up,
-        Direction::Left => Direction::Right,
-        Direction::Right => Direction::Left,
-        Direction::LeftUp => Direction::RightDown,
-        Direction::LeftDown => Direction::RightUp,
-        Direction::RightUp => Direction::LeftDown,
-        Direction::RightDown => Direction::LeftUp,
-    };
-    let mut dir_vals = direction.values();
-    let magnitude = word_length - 1;
-    dir_vals = (row as i32 + dir_vals.0 * magnitude, column as i32 + dir_vals.1 * magnitude);
-    trace!("Reversed ({:?}, {:?}, {:?}) to ({:?}, {:?}, {:?})", row, column, direction, dir_vals.0, dir_vals.1, opposite_direction);
-    return (dir_vals.0 as usize, dir_vals.1 as usize, opposite_direction);
-}
-
 pub fn get_answers() {
     env_logger::init();
     let mut input = get_input();
     input.find_word_instances("XMAS");
-    info!("Day 4, Part 1: Found {} instances of the word", input.found.len());
+    println!("Day 4 part 1 instances of word: {:?}", input.found.len());
+    input.find_word_instances("MAS");
+    println!("Day 4 part 2 crosses: {:?}", input.find_crosses("MAS".len()));
 }
