@@ -1,11 +1,6 @@
-use std::io::{BufRead, BufReader};
+use std::cmp::Ordering;
 use std::fs::File;
-// TODO:
-// 1. Parse ordering rules and sort them by number
-// 2. Determine all rules that apply
-// 3. Check if the orders are matched
-// 4. For all valid updates, sum up the middle numbers
-
+use std::io::{BufRead, BufReader};
 
 fn parse_ordering_rules<R: std::io::Read>(reader: &mut BufReader<R>) -> Vec<(i32, i32)> {
     let mut rules = Vec::new();
@@ -16,8 +11,12 @@ fn parse_ordering_rules<R: std::io::Read>(reader: &mut BufReader<R>) -> Vec<(i32
         }
         let parsed_rule = rule
             .split('|')
-            .map(|s| s.trim().parse::<i32>().expect("Could not parse number in rule"))
-            .collect::<Vec<i32>>();        
+            .map(|s| {
+                s.trim()
+                    .parse::<i32>()
+                    .expect("Could not parse number in rule")
+            })
+            .collect::<Vec<i32>>();
         rules.push((parsed_rule[0], parsed_rule[1]));
     }
     return rules;
@@ -29,7 +28,11 @@ fn parse_levels<R: std::io::Read>(reader: &mut BufReader<R>) -> Vec<Vec<i32>> {
         let level = line.unwrap();
         let parsed_level = level
             .split(',')
-            .map(|s| s.trim().parse::<i32>().expect("Could not parse number in level"))
+            .map(|s| {
+                s.trim()
+                    .parse::<i32>()
+                    .expect("Could not parse number in level")
+            })
             .collect::<Vec<i32>>();
         levels.push(parsed_level);
     }
@@ -44,43 +47,44 @@ fn get_input() -> (Vec<(i32, i32)>, Vec<Vec<i32>>) {
     return (rules, levels);
 }
 
-fn get_applicable_rules<'a>(rules: &'a mut Vec<(i32, i32)>, level: &'a Vec<i32>) -> Vec<&'a (i32, i32)> {
+fn get_applicable_rules<'a>(rules: &'a [(i32, i32)], level: &[i32]) -> Vec<&'a (i32, i32)> {
     let applicable = rules
-            .iter()
-            .filter(|r| level.contains(&r.0))
-            .collect::<Vec<&(i32, i32)>>();
+        .iter()
+        .filter(|r| level.contains(&r.0))
+        .collect::<Vec<&(i32, i32)>>();
     return applicable;
 }
 
-fn level_passes_rules(rules: Vec<&(i32, i32)>, level: Vec<i32>) -> bool {
-    let mut pass = true;
-    for rule in rules {
-        let forerunner_index = level.iter().position(|&x| x == rule.0).expect("forerunner not found");
-        let caboose_index = level.iter().position(|&x| x == rule.1);
-        if caboose_index.is_none() {
-            continue;
-        }
-        if caboose_index.unwrap() < forerunner_index {
-            pass = false;
+fn get_sums() -> (i32, i32) {
+    let (rules, mut levels) = get_input();
+    let mut sum = 0;
+    let mut broken_sum = 0;
+
+    for level in &mut levels {
+        let applicable_rules = get_applicable_rules(&rules, &level);
+        let compare = |x: &i32, y: &i32| {
+            let (x, y) = (*x, *y);
+            if applicable_rules.contains(&&(x, y)) {
+                Ordering::Less
+            } else if applicable_rules.contains(&&(y, x)) {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        };
+
+        if level.is_sorted_by(|a, b| compare(a, b) != Ordering::Greater) {
+            sum += level[level.len() / 2];
+        } else {
+            level.sort_by(compare);
+            broken_sum += level[level.len() / 2];
         }
     }
-    return pass;
-}
-
-fn get_passing_levels_sum() -> i32 {
-    let (mut rules, levels) = get_input();
-    let mut sum = 0;
-    levels
-        .iter()
-        .filter(|l| level_passes_rules(get_applicable_rules(&mut rules, l), l.to_vec()))
-        .for_each(|l| {
-            let middle_index = l.len() / 2;
-            sum += l[middle_index];
-        });
-    return sum;
+    return (sum, broken_sum);
 }
 
 pub fn get_answers() {
-    let passing_sum = get_passing_levels_sum();
-    println!("Day 5 part 1 passing sum: {:?}", passing_sum);
+    let sums = get_sums();
+    println!("Day 5 part 1 passing sum: {:?}", sums.0);
+    println!("Day 5 part 2 broken sum: {:?}", sums.1);
 }

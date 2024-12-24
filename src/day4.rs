@@ -1,10 +1,9 @@
 use std::{
     fs::File,
     io::{prelude::*, BufReader},
-    path::Path
+    path::Path,
 };
 
-use log::{debug, error, info, warn, trace};
 use env_logger;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,14 +55,15 @@ impl WordMatrix {
     }
 
     pub fn read_direction(&self, row: usize, col: usize, direction: Direction) -> Option<&char> {
-        let mut result = None;
         match direction {
             direction => {
                 let (row_offset, col_offset) = direction.values();
-                result = self.grid.get((row as i32 + row_offset) as usize)?.get((col as i32 + col_offset) as usize);
-            },
+                return self
+                    .grid
+                    .get((row as i32 + row_offset) as usize)?
+                    .get((col as i32 + col_offset) as usize);
+            }
         }
-        return result;
     }
 
     pub fn char_is_present(&self, row: usize, col: usize, target: &char) -> Vec<Direction> {
@@ -71,14 +71,18 @@ impl WordMatrix {
         for direction in Direction::iterator() {
             if self
                 .read_direction(row, col, direction)
-                .map_or(false, |c| c == target) {
-                    directions.push(direction);
+                .map_or(false, |c| c == target)
+            {
+                directions.push(direction);
             }
         }
         return directions;
     }
 
-    pub fn try_finish_word<I>(&mut self, row: usize, col: usize, mut chars: I) where I: Iterator<Item = char> + Clone, {
+    pub fn try_finish_word<I>(&mut self, row: usize, col: usize, mut chars: I)
+    where
+        I: Iterator<Item = char> + Clone,
+    {
         // Success == count + 1 because we're starting with the second char
         let num_letters_for_success = chars.clone().count() + 1;
         let mut num_letters_found = 2;
@@ -93,14 +97,15 @@ impl WordMatrix {
             let mut pos = (row as i32 + dx, col as i32 + dy);
             let mut char_list = chars.clone();
 
-            // Check if word is present in the direction           
+            // Check if word is present in the direction
             while let Some(next_char) = char_list.next() {
                 if self
                     .read_direction(pos.0 as usize, pos.1 as usize, dir)
-                    .map_or(false, |c| c == &next_char) {
-                        pos.0 += dx;
-                        pos.1 += dy;
-                        num_letters_found += 1;
+                    .map_or(false, |c| c == &next_char)
+                {
+                    pos.0 += dx;
+                    pos.1 += dy;
+                    num_letters_found += 1;
                 } else {
                     break;
                 }
@@ -126,8 +131,7 @@ impl WordMatrix {
                     let current = self.grid[row][col];
                     if current == start {
                         self.try_finish_word(row, col, word.chars().skip(1));
-                    }
-                    else if current == end {
+                    } else if current == end {
                         self.try_finish_word(row, col, word.chars().rev().skip(1));
                     }
                 }
@@ -138,7 +142,9 @@ impl WordMatrix {
     pub fn find_crosses(&mut self, word_length: usize) -> i32 {
         let mut crosses = 0;
         for word in &self.found {
-            if word.2 == Direction::RightDown && (word.1 + (word_length - 1) > self.grid[0].len() - 1) {
+            if word.2 == Direction::RightDown
+                && (word.1 + (word_length - 1) > self.grid[0].len() - 1)
+            {
                 continue;
             }
             let mirrored_dir = match word.2 {
@@ -181,5 +187,8 @@ pub fn get_answers() {
     input.find_word_instances("XMAS");
     println!("Day 4 part 1 instances of word: {:?}", input.found.len());
     input.find_word_instances("MAS");
-    println!("Day 4 part 2 crosses: {:?}", input.find_crosses("MAS".len()));
+    println!(
+        "Day 4 part 2 crosses: {:?}",
+        input.find_crosses("MAS".len())
+    );
 }
